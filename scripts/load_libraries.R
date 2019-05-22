@@ -6,7 +6,7 @@ load_reqs <- function(reqs) {
   }
 }
 
-pkgs <- c("data.table", "lubridate", "ggplot2", "ggrepel", "ggiraph", "plotly", "caret", "bit64")
+pkgs <- c("data.table", "lubridate", "ggplot2", "ggrepel", "ggiraph", "plotly", "caret", "bit64", "DataExplorer")
 
 load_reqs(pkgs)
 
