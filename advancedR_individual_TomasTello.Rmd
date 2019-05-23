@@ -15,6 +15,8 @@ This report shows the methodology followed to analyze a House Prices dataset to 
 
 ```{r load libraries, echo = FALSE, message=FALSE, warning=FALSE}
 source('scripts/load_libraries.R')
+source('scripts/f_partition.R')
+source('scripts/regression_metrics.R')
 ```
 
 ## Data Loading
@@ -105,8 +107,69 @@ str(train_data)
 
 2) Categorical variables analysis
 
-```{r data exploration 3}
+```{r data exploration 3, message = FALSE}
 
 plot_bar(train_data)
+
+```
+
+3) Correlation analysis for continuous variables
+
+```{r data exploration 4}
+
+plot_correlation(train_data[,-c('id')], type = "c")
+
+```
+
+Using the correlation matrix, we can start to do some feature selection, removing highly correlated variables. In this case: sqft_above has a 0.88 correlation with sqft_living, so we can remove this variable to avoid redundancy.
+
+Also sqft_living15 and sqft_lot15 are highly correlated to their original counterparts, so we will remove these variables for our analysis.
+
+```{r feature selection}
+train_data_sub <- train_data[,-c('id', 'sqft_living15', 'sqft_lot15', 'sqft_above', 'date')]
+test_data_sub <- test_data[,-c('id', 'sqft_living15', 'sqft_lot15', 'sqft_above', 'date')]
+
+str(train_data_sub)
+```
+
+## Baseline Model
+
+To run a first model (linear regression), we will first one hot encode all categorical variables. To do so, we need to stack both train and test datasets to make sure both datasets follow the same encoding.
+
+```{r stacking datasets}
+train_data_sub$train <- 1
+test_data_sub$train <- 0
+
+stacked <- rbind(train_data_sub, test_data_sub, fill = TRUE)
+
+#Dummify the stacked data table
+stacked_dum <- dummify(stacked, maxcat = 70)
+
+#Split again based on 'train' flag
+train_data_sub <- stacked_dum[stacked_dum$train == 1, -'train']
+test_data_sub <- stacked_dum[stacked_dum$train == 0, -'train']
+
+str(train_data_sub)
+```
+
+To evaluate our baseline model and the feature engineering process, we will take a holdout (validation data) from the train dataset using the f_partition script:
+
+```{r train split}
+
+train_val <- f_partition(train_data_sub, seed = 1414)
+
+str(train_val)
+
+```
+
+Now we train our baseline model:
+
+```{r baseline}
+
+baseline <- lm(price ~ ., data=train_val$train)
+
+test_lm<-predict(baseline, newdata = train_val$test)
+mape_lm<-mape(real=train_val$test$price, predicted = test_lm)
+mape_lm
 
 ```
