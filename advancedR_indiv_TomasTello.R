@@ -41,3 +41,15 @@ str(raw_data_train)
 
 plot_bar(raw_data_train)
 
+#correlation analysis
+plot_correlation(raw_data_train[,-c('id')], type = "c")
+
+#subset training data
+train_data_sub <- raw_data_train[,-c('id', 'sqft_living15', 'sqft_lot15', 'sqft_above', 'date')]
+
+
+#dummy enconde categorical variables
+train_data_sub <- dummify(train_data_sub, maxcat = 70)
+str(train_data_sub)
+
+#baseline model
