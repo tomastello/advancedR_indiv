@@ -22,16 +22,22 @@ sum(is.na(raw_data_train))
 
 #Variable analysis
 summary(raw_data_train)
+introduce(raw_data_train)
+plot_intro(raw_data_train)
 
 ##### Exploratory Data Analysis ######
 
-#plot missing values
-plot_missing(raw_data_train)
 
 #Variable analysis
+
 plot_density(raw_data_train[,-c('id')])
 plot_boxplot(raw_data_train[,-c('id')], by = "price")
-plot_correlation(raw_data_train[,-c('id')])
 
+#Convert to factor
+raw_data_train$condition <- as.factor(raw_data_train$condition)
+raw_data_train$view <- as.factor(raw_data_train$view)
 
+str(raw_data_train)
+
+plot_bar(raw_data_train)
 
