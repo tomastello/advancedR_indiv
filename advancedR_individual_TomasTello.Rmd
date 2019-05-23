@@ -1,0 +1,112 @@
+---
+title: "Advaced R - Individual Assignment"
+author: "Tomas Tello"
+date: "22 de mayo de 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## House Prices Prediction Problem
+
+This report shows the methodology followed to analyze a House Prices dataset to build a model that predicts the prices on a test set according to explanatory variables.
+
+```{r load libraries, echo = FALSE, message=FALSE, warning=FALSE}
+source('scripts/load_libraries.R')
+```
+
+## Data Loading
+
+First step: Load the dataset from local storage into data table objects
+
+```{r data loading}
+raw_data_train <-fread('data/house_price_train.csv', stringsAsFactors = F)
+raw_data_test <-fread('data/house_price_test.csv', stringsAsFactors = F)
+
+str(raw_data_train)
+```
+
+## Data Cleaning and Preparation
+
+Every transformation is declared within a function, so it can be replicated in the train and test sets.
+
+```{r data preparation}
+
+transformations <- function(df){
+  #convert to date format
+  df$date <- as.Date(df$date, "%m/%d/%Y")
+  #convert discrete variables to factors
+  df$zipcode <- as.factor(df$zipcode)
+  #convert all integers to numeric
+  df[ , names(df)[sapply(df, is.integer)]:=
+             lapply(.SD,as.numeric),.SDcols = 
+             names(df)[sapply(df, is.integer)]]
+}
+
+train_data <- transformations(raw_data_train)
+test_data <- transformations(raw_data_test)
+
+str(train_data)
+
+```
+
+
+## Data Exploration
+
+Using the DataExplorer library, we can can do a quick analysis of the variables:
+
+1) Basic metrics (including NA detection)
+
+```{r data exploration 1}
+
+summary(train_data)
+introduce(train_data)
+plot_intro(train_data)
+
+```
+
+2) Continuous variables analysis and how they relate to the target variable
+
+```{r data exploration 2}
+
+plot_density(train_data[,-c('id')])
+plot_boxplot(train_data[,-c('id')], by = "price")
+
+```
+
+Looking at the density plots and box plots, we can conclude that the variables "view", "condition" and "floors" can be considered categorical, as they are not continuous and they show no ordinality in relation to the target variables
+
+We then update the transformations function and apply it to the dataset:
+
+```{r data preparation 2}
+
+transformations <- function(df){
+  #convert to date format
+  df$date <- as.Date(df$date, "%m/%d/%Y")
+  #convert discrete variables to factors
+  df$zipcode <- as.factor(df$zipcode)
+  df$condition <- as.factor(df$condition)
+  df$view <- as.factor(df$view)
+  df$floors <- as.factor(df$floors)
+  #convert all integers to numeric
+  df[ , names(df)[sapply(df, is.integer)]:=
+             lapply(.SD,as.numeric),.SDcols = 
+             names(df)[sapply(df, is.integer)]]
+}
+
+train_data <- transformations(raw_data_train)
+test_data <- transformations(raw_data_test)
+
+str(train_data)
+
+```
+
+2) Categorical variables analysis
+
+```{r data exploration 3}
+
+plot_bar(train_data)
+
+```
