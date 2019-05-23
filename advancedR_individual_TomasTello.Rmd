@@ -162,7 +162,7 @@ str(train_val)
 
 ```
 
-Now we train our baseline model:
+Now we train our baseline model. The metric for our predictions will be the Mean Absolute Percent Error (MAPE). After obtaining our baseline score, we will perform some feature engineering and evaluate if these new features help reducing the MAPE.
 
 ```{r baseline}
 
@@ -173,3 +173,10 @@ mape_lm<-mape(real=train_val$test$price, predicted = test_lm)
 mape_lm
 
 ```
+
+## Feature Engineering
+
+### House age
+The first feature to be created is the house age which will be obtained from the difference between the date of sale and the date of construction. 
+
+
