@@ -175,6 +175,8 @@ str(raw_data_train)</code></pre>
   df[ , names(df)[sapply(df, is.integer)]:=
              lapply(.SD,as.numeric),.SDcols = 
              names(df)[sapply(df, is.integer)]]
+  
+  return(df)
 }
 
 train_data &lt;- transformations(raw_data_train)
@@ -277,17 +279,33 @@ str(train_data)</code></pre>
 <p>Looking at the density plots and box plots, we can conclude that the variables “view”, “condition” and “floors” can be considered categorical, as they are not continuous and they show no ordinality in relation to the target variables</p>
 <p>We then update the transformations function and apply it to the dataset:</p>
 <pre class="r"><code>transformations &lt;- function(df){
+  df1 &lt;- data.table(df)
+  
   #convert to date format
-  df$date &lt;- as.Date(df$date, &quot;%m/%d/%Y&quot;)
+  df1$date &lt;- as.Date(df1$date, &quot;%m/%d/%Y&quot;)
   #convert discrete variables to factors
-  df$zipcode &lt;- as.factor(df$zipcode)
-  df$condition &lt;- as.factor(df$condition)
-  df$view &lt;- as.factor(df$view)
-  df$floors &lt;- as.factor(df$floors)
+  df1$zipcode &lt;- as.factor(df1$zipcode)
+  df1$condition &lt;- as.factor(df1$condition)
+  df1$view &lt;- as.factor(df1$view)
+  df1$floors &lt;- as.factor(df1$floors)
   #convert all integers to numeric
-  df[ , names(df)[sapply(df, is.integer)]:=
+  df1[ , names(df1)[sapply(df1, is.integer)]:=
              lapply(.SD,as.numeric),.SDcols = 
-             names(df)[sapply(df, is.integer)]]
+             names(df1)[sapply(df1, is.integer)]]
+  
+  return(df1)
+}
+
+scale_df &lt;- function(df){
+  df1 &lt;- data.table(df)
+  
+  numeric_vars &lt;- names(df1)[sapply(df1, is.numeric)]
+  numeric_vars &lt;- numeric_vars[!numeric_vars %in% c('price')]
+  ## Scale 
+  df1[, (numeric_vars) := lapply(.SD, scale), .SDcols=numeric_vars]
+  
+  return(df1)  
+  
 }
 
 train_data &lt;- transformations(raw_data_train)
@@ -321,9 +339,6 @@ str(train_data)</code></pre>
 <li>Categorical variables analysis</li>
 </ol>
 <pre class="r"><code>plot_bar(train_data)</code></pre>
-<pre><code>## 2 columns ignored with more than 50 categories.
-## date: 372 categories
-## zipcode: 70 categories</code></pre>
 <p><img src="data:image/png;base64,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" width="672" /></p>
 <ol start="3" style="list-style-type: decimal">
 <li>Correlation analysis for continuous variables</li>
@@ -354,6 +369,1243 @@ str(train_data_sub)</code></pre>
 ##  $ lat          : num  47.4 47.7 47.6 47.8 47.7 ...
 ##  $ long         : num  -122 -122 -122 -122 -122 ...
 ##  - attr(*, &quot;.internal.selfref&quot;)=&lt;externalptr&gt;</code></pre>
+</div>
+<div id="baseline-model" class="section level2">
+<h2>Baseline Model</h2>
+<p>To run a first model (linear regression), we will first one hot encode all categorical variables. To do so, we need to stack both train and test datasets to make sure both datasets follow the same encoding.</p>
+<pre class="r"><code>train_data_sub$train &lt;- 1
+test_data_sub$train &lt;- 0
+
+stacked &lt;- rbind(train_data_sub, test_data_sub, fill = TRUE)
+
+#Dummify the stacked data table
+stacked_dum &lt;- dummify(stacked, maxcat = 70)
+
+#Split again based on 'train' flag
+train_data_sub &lt;- stacked_dum[stacked_dum$train == 1, -'train']
+test_data_sub &lt;- stacked_dum[stacked_dum$train == 0, -'train']</code></pre>
+<p>To evaluate our baseline model and the feature engineering process, we will take a holdout (validation data) from the train dataset using the f_partition script:</p>
+<pre class="r"><code>train_val &lt;- f_partition(train_data_sub, seed = 1414)</code></pre>
+<p>Now we train our baseline model. The metric for our predictions will be the Mean Absolute Percent Error (MAPE). After obtaining our baseline score, we will perform some feature engineering and evaluate if these new features help reducing the MAPE.</p>
+<pre class="r"><code>baseline &lt;- lm(price ~ ., data=scale_df(train_val$train))
+
+test_lm&lt;-predict(baseline, newdata = scale_df(train_val$test))</code></pre>
+<pre><code>## Warning in predict.lm(baseline, newdata = scale_df(train_val$test)):
+## prediction from a rank-deficient fit may be misleading</code></pre>
+<pre class="r"><code>mape_lm&lt;-mape(real=train_val$test$price, predicted = test_lm)
+mape_lm</code></pre>
+<pre><code>## [1] 0.2023602</code></pre>
+</div>
+<div id="feature-engineering" class="section level2">
+<h2>Feature Engineering</h2>
+<div id="data-preparation-pipeline" class="section level3">
+<h3>Data preparation pipeline</h3>
+<p>Before the feature engineering process, we will define every step prev</p>
+<pre class="r"><code>feat_select &lt;- function(df){
+    df_sub &lt;- df[, -c('id', 'sqft_living15', 'sqft_lot15', 'sqft_above', 'date')]
+    
+    return(df_sub)
+}
+
+encode &lt;- function(df_train, df_test){
+  
+  df_train$train &lt;- 1
+  df_test$train &lt;- 0
+
+  stacked &lt;- rbind(df_train, df_test, fill = TRUE)
+
+  #Dummify the stacked data table
+  stacked_dum &lt;- dummify(stacked, maxcat = 100)
+  
+  #Split again based on 'train' flag
+  df_train &lt;- stacked_dum[stacked_dum$train == 1, -'train']
+  df_test &lt;- stacked_dum[stacked_dum$train == 0, -'train']
+  
+  return(list(&quot;train&quot; = df_train, &quot;test&quot; = df_test))
+}</code></pre>
+</div>
+<div id="house-age" class="section level3">
+<h3>House age</h3>
+<p>The first feature to be created is the house age which will be obtained from the difference between the date of sale and the date of construction.</p>
+<pre class="r"><code>train_data &lt;- transformations(raw_data_train)
+test_data &lt;- transformations(raw_data_test)
+
+train_data$house_age &lt;- year(train_data$date) - train_data$yr_built
+test_data$house_age &lt;- year(test_data$date) - test_data$yr_built
+
+
+train_data_sub &lt;- feat_select(train_data)
+test_data_sub &lt;- feat_select(test_data)
+
+#train_data_enc &lt;- encode(train_data_sub, test_data_sub)
+
+train_val &lt;- f_partition(train_data_sub, seed = 1414)
+
+baseline &lt;- lm(price ~ ., data= scale_df(train_val$train))
+
+test_lm&lt;-predict(baseline, newdata = scale_df(train_val$test))
+mape_lm&lt;-mape(real=train_val$test$price, predicted = test_lm)
+mape_lm</code></pre>
+<pre><code>## [1] 0.1986157</code></pre>
+<p>Calculating the house age already improved the MAPE by a little, so we are keeping this feature</p>
+</div>
+<div id="house-age-after-renovation" class="section level3">
+<h3>House age after renovation</h3>
+<p>Similar to the last feature, now we will calculate the age of the house after renovation. If it has not been renewed, we will keep this value as 0.</p>
+<pre class="r"><code>renovation_age &lt;- function(df){
+  df1 &lt;- data.table(df)
+  
+  df1$renov_age &lt;- 0
+  
+  for (i in 1:nrow(df)){
+    if(df1$yr_renovated[i]&gt;0){
+      df1$renov_age[i] &lt;- year(df1$date[i]) - df1$yr_renovated[i]
+    }
+  }
+  
+  return(df1)
+}
+
+train_data &lt;- renovation_age(train_data)
+test_data &lt;- renovation_age(test_data)
+
+feat_select &lt;- function(df){
+    df_sub &lt;- df[, -c('id', 'sqft_living15', 'sqft_lot15', 'sqft_above', 'date')]
+    
+    return(df_sub)
+}
+
+train_data_sub &lt;- feat_select(train_data)
+test_data_sub &lt;- feat_select(test_data)
+
+#train_data_enc &lt;- encode(train_data_sub, test_data_sub)
+
+train_val &lt;- f_partition(train_data_sub, seed = 1414)
+
+baseline &lt;- lm(price ~ ., data= scale_df(train_val$train))
+
+test_lm&lt;-predict(baseline, newdata = scale_df(train_val$test))
+mape_lm&lt;-mape(real=train_val$test$price, predicted = test_lm)
+mape_lm</code></pre>
+<pre><code>## [1] 0.1982341</code></pre>
+<p>Although there is no significant improvement in the score, we will keep this feature too.</p>
+</div>
+<div id="property-size-features" class="section level3">
+<h3>Property size features</h3>
+<p>The dataset contains several features related to the property size. We will try to generate new features trying linear combinations of these size features so explore which ones improve our score:</p>
+<pre class="r"><code>size_features &lt;- function(df){
+  df1 &lt;- data.table(df)
+  
+  df1$living_lot_ratio &lt;- df1$sqft_living/df1$sqft_lot
+  df1$above_lot_ratio &lt;- df1$sqft_above/df1$sqft_lot
+  df1$basement_lot_ratio &lt;- df1$sqft_basement/df1$sqft_lot
+  df1$basement_living_ratio &lt;- df1$sqft_basement/df1$sqft_living
+  
+  return(df1)
+}
+
+train_data &lt;- size_features(train_data)
+test_data &lt;- size_features(test_data)
+
+train_data_sub &lt;- feat_select(train_data)
+test_data_sub &lt;- feat_select(test_data)
+
+#train_data_enc &lt;- encode(train_data_sub, test_data_sub)
+
+train_val &lt;- f_partition(train_data_sub, seed = 1414)
+
+baseline &lt;- lm(price ~ ., data= scale_df(train_val$train))
+
+test_lm&lt;-predict(baseline, newdata = scale_df(train_val$test))</code></pre>
+<pre><code>## Warning in predict.lm(baseline, newdata = scale_df(train_val$test)):
+## prediction from a rank-deficient fit may be misleading</code></pre>
+<pre class="r"><code>mape_lm&lt;-mape(real=train_val$test$price, predicted = test_lm)
+mape_lm</code></pre>
+<pre><code>## [1] 0.1930074</code></pre>
+<p>These new features show some improvement to our MAPE score so we will keep them.</p>
+</div>
+<div id="clustering" class="section level3">
+<h3>Clustering</h3>
+<p>The final step in our feature engineering process will be to create clusters based on location and size feature from our dataset</p>
+<pre class="r"><code>clustering &lt;- function(df_train, df_test){
+ 
+  df_train$train &lt;- 1
+  df_test$train &lt;- 0
+  
+  df1 &lt;- rbind(df_train, df_test, fill = TRUE)
+  
+  set.seed(1912)
+  clusters &lt;- kmeans(scale(df1[,c(&quot;lat&quot;, &quot;long&quot;, &quot;living_lot_ratio&quot;, &quot;basement_living_ratio&quot;)]),50)
+  
+  df1$cluster &lt;- as.factor(clusters$cluster)
+  
+  df_train &lt;- df1[df1$train == 1, -'train']
+  df_test &lt;- df1[df1$train == 0, -'train']
+  
+  return(list(&quot;train&quot; = df_train, &quot;test&quot; = df_test))
+  
+}
+
+clustered &lt;- clustering(train_data, test_data)
+
+train_data &lt;- clustered$train
+test_data &lt;- clustered$test
+
+train_data_sub &lt;- feat_select(train_data)
+test_data_sub &lt;- feat_select(test_data)
+
+#train_data_enc &lt;- encode(train_data_sub, test_data_sub)
+
+train_val &lt;- f_partition(train_data_sub, seed = 1414)
+
+baseline &lt;- lm(price ~ ., data= scale_df(train_val$train))
+
+test_lm&lt;-predict(baseline, newdata = scale_df(train_val$test))</code></pre>
+<pre><code>## Warning in predict.lm(baseline, newdata = scale_df(train_val$test)):
+## prediction from a rank-deficient fit may be misleading</code></pre>
+<pre class="r"><code>mape_lm&lt;-mape(real=train_val$test$price, predicted = test_lm)
+mape_lm</code></pre>
+<pre><code>## [1] 0.1914659</code></pre>
+<p>The score after the clustering show also some improvement so we will keep these new features.</p>
+<p>Now that we have an improved dataset with new features, we will proceed to try different models and test them on our validation set, and later do cross validation, to select a model that can predict best the house prices with the features from our dataset.</p>
+</div>
+</div>
+<div id="modeling" class="section level2">
+<h2>Modeling</h2>
+<div id="linear-model-with-stepwise-feature-selection" class="section level3">
+<h3>Linear model with stepwise feature selection</h3>
+<p>First we will try a linear regression with stepwise feature selection. This will help us both improve our score and also detect which variables are the most important ones to be used for our analysis.</p>
+<pre class="r"><code>stepwise &lt;- stepAIC(lm(price ~ ., data= scale_df(train_val$train)), trace = F)
+
+summary(stepwise)</code></pre>
+<pre><code>## 
+## Call:
+## lm(formula = price ~ bedrooms + bathrooms + sqft_living + floors + 
+##     waterfront + view + condition + grade + sqft_basement + yr_built + 
+##     yr_renovated + zipcode + lat + long + house_age + renov_age + 
+##     above_lot_ratio + basement_living_ratio + cluster, data = scale_df(train_val$train))
+## 
+## Residuals:
+##      Min       1Q   Median       3Q      Max 
+## -1300125   -65673     1294    60772  3927299 
+## 
+## Coefficients:
+##                        Estimate Std. Error t value             Pr(&gt;|t|)
+## (Intercept)            381967.0    49518.3   7.714 0.000000000000013069
+## bedrooms               -23185.9     1782.5 -13.007 &lt; 0.0000000000000002
+## bathrooms               17989.9     2495.5   7.209 0.000000000000593150
+## sqft_living            180539.6     3437.7  52.518 &lt; 0.0000000000000002
+## floors1.5              -23933.8     5554.9  -4.309 0.000016544212779268
+## floors2                -44207.1     4828.9  -9.155 &lt; 0.0000000000000002
+## floors2.5              117620.1    17405.6   6.758 0.000000000014598395
+## floors3                -49723.6    13668.4  -3.638             0.000276
+## floors3.5              187147.9    78976.1   2.370             0.017817
+## waterfront              54106.3     1707.8  31.681 &lt; 0.0000000000000002
+## view1                   67656.9    10949.9   6.179 0.000000000664417746
+## view2                   58836.3     6764.7   8.698 &lt; 0.0000000000000002
+## view3                  149102.4     9166.4  16.266 &lt; 0.0000000000000002
+## view4                  259006.6    14460.2  17.912 &lt; 0.0000000000000002
+## condition2               5460.8    42036.0   0.130             0.896641
+## condition3              11600.0    39309.7   0.295             0.767927
+## condition4              31686.4    39312.1   0.806             0.420243
+## condition5              80607.8    39532.5   2.039             0.041467
+## grade                   69340.4     2550.6  27.186 &lt; 0.0000000000000002
+## sqft_basement           34319.9     4781.9   7.177 0.000000000000749175
+## yr_built               812679.4    84025.9   9.672 &lt; 0.0000000000000002
+## yr_renovated            18714.8     2139.7   8.747 &lt; 0.0000000000000002
+## zipcode98002            48188.7    17449.2   2.762             0.005758
+## zipcode98003           -27987.2    16830.4  -1.663             0.096356
+## zipcode98004           704821.6    31616.6  22.293 &lt; 0.0000000000000002
+## zipcode98005           245177.4    33693.5   7.277 0.000000000000360701
+## zipcode98006           229503.9    28491.5   8.055 0.000000000000000859
+## zipcode98007           199287.9    34725.0   5.739 0.000000009724289506
+## zipcode98008           222207.4    33561.1   6.621 0.000000000037016086
+## zipcode98010           104970.5    30631.6   3.427             0.000612
+## zipcode98011            38726.6    41024.9   0.944             0.345197
+## zipcode98014           114038.2    47568.0   2.397             0.016526
+## zipcode98019            76434.5    46895.7   1.630             0.103150
+## zipcode98022            49520.2    28207.7   1.756             0.079186
+## zipcode98023           -72650.2    17387.7  -4.178 0.000029557473030755
+## zipcode98024           177984.2    40210.8   4.426 0.000009661435129006
+## zipcode98027           164649.6    30033.9   5.482 0.000000042768678018
+## zipcode98028            23070.5    39388.1   0.586             0.558070
+## zipcode98029           213099.7    33689.2   6.325 0.000000000260346650
+## zipcode98030             5938.9    20660.5   0.287             0.773769
+## zipcode98031             4995.3    21284.8   0.235             0.814453
+## zipcode98032            -1735.9    22784.6  -0.076             0.939271
+## zipcode98033           299342.6    34758.7   8.612 &lt; 0.0000000000000002
+## zipcode98034           120916.2    37146.9   3.255             0.001136
+## zipcode98038            61962.1    24582.9   2.521             0.011729
+## zipcode98039          1087160.6    41626.1  26.117 &lt; 0.0000000000000002
+## zipcode98040           410839.2    28509.2  14.411 &lt; 0.0000000000000002
+## zipcode98042             8806.7    20447.0   0.431             0.666688
+## zipcode98045           126391.6    42395.4   2.981             0.002876
+## zipcode98052           183401.9    35526.3   5.162 0.000000247177020787
+## zipcode98053           155205.2    39089.2   3.971 0.000072078122458905
+## zipcode98055            24109.2    23829.8   1.012             0.311687
+## zipcode98056            65140.5    25747.5   2.530             0.011418
+## zipcode98058            15708.2    23230.2   0.676             0.498926
+## zipcode98059            74880.3    25704.6   2.913             0.003584
+## zipcode98065           114904.9    43101.2   2.666             0.007686
+## zipcode98070          -148150.0    27276.0  -5.432 0.000000056833025532
+## zipcode98072            79839.9    40776.4   1.958             0.050251
+## zipcode98074           152525.3    35071.8   4.349 0.000013778132218384
+## zipcode98075           152818.7    34166.9   4.473 0.000007785859487564
+## zipcode98077            64496.5    43075.1   1.497             0.134337
+## zipcode98092           -12946.0    17210.3  -0.752             0.451931
+## zipcode98102           423848.9    36497.5  11.613 &lt; 0.0000000000000002
+## zipcode98103           234445.8    34048.6   6.886 0.000000000006004539
+## zipcode98105           375486.7    34666.4  10.831 &lt; 0.0000000000000002
+## zipcode98106            43913.1    26999.4   1.626             0.103877
+## zipcode98107           242089.4    35215.6   6.874 0.000000000006490685
+## zipcode98108            32783.3    28927.6   1.133             0.257112
+## zipcode98109           431704.7    36607.1  11.793 &lt; 0.0000000000000002
+## zipcode98112           505307.9    32276.7  15.655 &lt; 0.0000000000000002
+## zipcode98115           242236.1    34293.2   7.064 0.000000000001699872
+## zipcode98116           164613.1    29329.4   5.613 0.000000020322786812
+## zipcode98117           197166.5    34943.5   5.642 0.000000017098877622
+## zipcode98118            88502.1    26069.3   3.395             0.000689
+## zipcode98119           399249.1    34413.7  11.601 &lt; 0.0000000000000002
+## zipcode98122           250499.8    30986.4   8.084 0.000000000000000678
+## zipcode98125            93752.5    36673.5   2.556             0.010586
+## zipcode98126            75886.7    27262.5   2.784             0.005384
+## zipcode98133            49971.5    37826.1   1.321             0.186495
+## zipcode98136           129488.5    28148.7   4.600 0.000004259570277919
+## zipcode98144           197626.3    29314.7   6.742 0.000000000016299915
+## zipcode98146           -34347.1    26083.8  -1.317             0.187928
+## zipcode98148           -18438.9    29144.8  -0.633             0.526963
+## zipcode98155            27728.3    39147.3   0.708             0.478767
+## zipcode98166           -53032.0    24295.6  -2.183             0.029069
+## zipcode98168           -30658.8    24937.3  -1.229             0.218929
+## zipcode98177            69443.7    39658.7   1.751             0.079963
+## zipcode98178           -27641.4    25609.7  -1.079             0.280458
+## zipcode98188           -45238.6    25619.0  -1.766             0.077448
+## zipcode98198           -39161.4    18931.4  -2.069             0.038603
+## zipcode98199           256518.4    33742.9   7.602 0.000000000000031021
+## lat                     26420.8    11627.8   2.272             0.023089
+## long                   -49929.2     9165.4  -5.448 0.000000051951838172
+## house_age              819517.1    83979.9   9.758 &lt; 0.0000000000000002
+## renov_age              -10950.5     2062.5  -5.309 0.000000111675975068
+## above_lot_ratio        -39748.3     4190.2  -9.486 &lt; 0.0000000000000002
+## basement_living_ratio  -81042.3     7106.4 -11.404 &lt; 0.0000000000000002
+## cluster2               -16482.6    26116.8  -0.631             0.527978
+## cluster3               165419.8    34346.1   4.816 0.000001478355440799
+## cluster4                 3254.5    23971.2   0.136             0.892008
+## cluster5                47518.6    37158.2   1.279             0.200983
+## cluster6                 7463.6    27710.4   0.269             0.787671
+## cluster7                10993.9    24494.3   0.449             0.653559
+## cluster8                 3570.5    19415.6   0.184             0.854094
+## cluster9                15338.2    22241.1   0.690             0.490437
+## cluster10              -16643.0    25715.3  -0.647             0.517513
+## cluster11               40744.1    20746.3   1.964             0.049560
+## cluster12              -17000.4    25619.9  -0.664             0.506981
+## cluster13               28403.3    27624.0   1.028             0.303869
+## cluster14              106408.4    20459.8   5.201 0.000000201252344549
+## cluster15               32937.6    23812.7   1.383             0.166628
+## cluster16               -7727.2    20751.4  -0.372             0.709624
+## cluster17               48956.1    24391.3   2.007             0.044757
+## cluster18               54918.2    20958.2   2.620             0.008793
+## cluster19               85973.0    36964.9   2.326             0.020044
+## cluster20                8362.2    29610.1   0.282             0.777633
+## cluster21              -41296.2    27588.7  -1.497             0.134454
+## cluster22               69571.4    21540.9   3.230             0.001242
+## cluster23               -6762.3    23550.5  -0.287             0.774010
+## cluster24               -3137.5    19761.0  -0.159             0.873851
+## cluster25              -39680.2    28759.5  -1.380             0.167694
+## cluster26                9837.8    23088.8   0.426             0.670052
+## cluster27               73561.2    20447.8   3.598             0.000322
+## cluster28               25584.9    19723.9   1.297             0.194600
+## cluster29               87963.4    25755.9   3.415             0.000639
+## cluster30                1818.1    19691.4   0.092             0.926436
+## cluster31              141112.7    33143.0   4.258 0.000020792194251857
+## cluster32              -28737.2    24908.6  -1.154             0.248641
+## cluster33               18212.1    19610.6   0.929             0.353070
+## cluster34                7294.1    17188.8   0.424             0.671318
+## cluster35                 799.7    23230.3   0.034             0.972540
+## cluster36               48752.2    24147.3   2.019             0.043512
+## cluster37               16933.9    27785.8   0.609             0.542241
+## cluster38              -25706.4    27489.6  -0.935             0.349736
+## cluster39              -27897.6    23404.0  -1.192             0.233281
+## cluster40               25636.4    20357.6   1.259             0.207942
+## cluster41               22548.1    15417.3   1.463             0.143621
+## cluster42               -7636.4    21628.1  -0.353             0.724035
+## cluster43               87567.6    22397.4   3.910 0.000092846586191939
+## cluster44               13039.0    28518.3   0.457             0.647525
+## cluster45               10176.2    26104.7   0.390             0.696673
+## cluster46              -23716.4    19617.8  -1.209             0.226712
+## cluster47               20186.7    18634.2   1.083             0.278689
+## cluster48               48915.2    20194.0   2.422             0.015437
+## cluster49               28112.4    23380.4   1.202             0.229231
+## cluster50               -1000.9    23890.9  -0.042             0.966583
+##                          
+## (Intercept)           ***
+## bedrooms              ***
+## bathrooms             ***
+## sqft_living           ***
+## floors1.5             ***
+## floors2               ***
+## floors2.5             ***
+## floors3               ***
+## floors3.5             *  
+## waterfront            ***
+## view1                 ***
+## view2                 ***
+## view3                 ***
+## view4                 ***
+## condition2               
+## condition3               
+## condition4               
+## condition5            *  
+## grade                 ***
+## sqft_basement         ***
+## yr_built              ***
+## yr_renovated          ***
+## zipcode98002          ** 
+## zipcode98003          .  
+## zipcode98004          ***
+## zipcode98005          ***
+## zipcode98006          ***
+## zipcode98007          ***
+## zipcode98008          ***
+## zipcode98010          ***
+## zipcode98011             
+## zipcode98014          *  
+## zipcode98019             
+## zipcode98022          .  
+## zipcode98023          ***
+## zipcode98024          ***
+## zipcode98027          ***
+## zipcode98028             
+## zipcode98029          ***
+## zipcode98030             
+## zipcode98031             
+## zipcode98032             
+## zipcode98033          ***
+## zipcode98034          ** 
+## zipcode98038          *  
+## zipcode98039          ***
+## zipcode98040          ***
+## zipcode98042             
+## zipcode98045          ** 
+## zipcode98052          ***
+## zipcode98053          ***
+## zipcode98055             
+## zipcode98056          *  
+## zipcode98058             
+## zipcode98059          ** 
+## zipcode98065          ** 
+## zipcode98070          ***
+## zipcode98072          .  
+## zipcode98074          ***
+## zipcode98075          ***
+## zipcode98077             
+## zipcode98092             
+## zipcode98102          ***
+## zipcode98103          ***
+## zipcode98105          ***
+## zipcode98106             
+## zipcode98107          ***
+## zipcode98108             
+## zipcode98109          ***
+## zipcode98112          ***
+## zipcode98115          ***
+## zipcode98116          ***
+## zipcode98117          ***
+## zipcode98118          ***
+## zipcode98119          ***
+## zipcode98122          ***
+## zipcode98125          *  
+## zipcode98126          ** 
+## zipcode98133             
+## zipcode98136          ***
+## zipcode98144          ***
+## zipcode98146             
+## zipcode98148             
+## zipcode98155             
+## zipcode98166          *  
+## zipcode98168             
+## zipcode98177          .  
+## zipcode98178             
+## zipcode98188          .  
+## zipcode98198          *  
+## zipcode98199          ***
+## lat                   *  
+## long                  ***
+## house_age             ***
+## renov_age             ***
+## above_lot_ratio       ***
+## basement_living_ratio ***
+## cluster2                 
+## cluster3              ***
+## cluster4                 
+## cluster5                 
+## cluster6                 
+## cluster7                 
+## cluster8                 
+## cluster9                 
+## cluster10                
+## cluster11             *  
+## cluster12                
+## cluster13                
+## cluster14             ***
+## cluster15                
+## cluster16                
+## cluster17             *  
+## cluster18             ** 
+## cluster19             *  
+## cluster20                
+## cluster21                
+## cluster22             ** 
+## cluster23                
+## cluster24                
+## cluster25                
+## cluster26                
+## cluster27             ***
+## cluster28                
+## cluster29             ***
+## cluster30                
+## cluster31             ***
+## cluster32                
+## cluster33                
+## cluster34                
+## cluster35                
+## cluster36             *  
+## cluster37                
+## cluster38                
+## cluster39                
+## cluster40                
+## cluster41                
+## cluster42                
+## cluster43             ***
+## cluster44                
+## cluster45                
+## cluster46                
+## cluster47                
+## cluster48             *  
+## cluster49                
+## cluster50                
+## ---
+## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+## 
+## Residual standard error: 155400 on 13675 degrees of freedom
+## Multiple R-squared:  0.8215, Adjusted R-squared:  0.8196 
+## F-statistic:   434 on 145 and 13675 DF,  p-value: &lt; 0.00000000000000022</code></pre>
+<pre class="r"><code>test_lms&lt;-predict(stepwise, newdata = scale_df(train_val$test))
+mape_lms&lt;-mape(real=train_val$test$price, predicted = test_lms)
+mape_lms</code></pre>
+<pre><code>## [1] 0.1914916</code></pre>
+<p>This model did not improve much our score so we will try with another family of models (random forest and XGBoost)</p>
+</div>
+<div id="random-forest-regression" class="section level3">
+<h3>Random Forest Regression</h3>
+<pre class="r"><code>RF &lt;- randomForest(price ~ ., data= train_val$train[,-c('zipcode')])
+
+
+
+test_rf&lt;-predict(RF, newdata = train_val$test[,-c('zipcode')])
+mape_rf&lt;-mape(real=train_val$test$price, predicted = test_rf)
+mape_rf</code></pre>
+<pre><code>## [1] 0.1393642</code></pre>
+<p>Random Forest already shows to be a much better model than linear regression. Now we will compare this model’s performance with XGBoost:</p>
+</div>
+<div id="xgboost-tree" class="section level3">
+<h3>XGBoost (tree)</h3>
+<pre class="r"><code>train_data_enc &lt;- encode(train_data_sub, test_data_sub)
+train_val &lt;- f_partition(train_data_enc$train, seed = 1414)
+
+xgb_0&lt;-xgboost(booster='gbtree',
+               data=as.matrix(train_val$train[, -c('price'), with = F]),
+               label=train_val$train$price,
+               nrounds = 200,
+               objective='reg:linear')</code></pre>
+<pre><code>## [1]  train-rmse:473789.031250 
+## [2]  train-rmse:351371.875000 
+## [3]  train-rmse:266862.781250 
+## [4]  train-rmse:210026.515625 
+## [5]  train-rmse:172137.828125 
+## [6]  train-rmse:146907.250000 
+## [7]  train-rmse:131609.765625 
+## [8]  train-rmse:121147.132812 
+## [9]  train-rmse:113967.750000 
+## [10] train-rmse:109222.242188 
+## [11] train-rmse:106099.851562 
+## [12] train-rmse:103466.726562 
+## [13] train-rmse:100932.640625 
+## [14] train-rmse:99239.210938 
+## [15] train-rmse:97386.609375 
+## [16] train-rmse:95306.500000 
+## [17] train-rmse:93860.914062 
+## [18] train-rmse:92137.867188 
+## [19] train-rmse:91319.453125 
+## [20] train-rmse:89978.562500 
+## [21] train-rmse:89192.656250 
+## [22] train-rmse:87909.101562 
+## [23] train-rmse:86798.828125 
+## [24] train-rmse:86128.835938 
+## [25] train-rmse:85408.023438 
+## [26] train-rmse:84838.953125 
+## [27] train-rmse:83814.890625 
+## [28] train-rmse:83377.234375 
+## [29] train-rmse:82497.523438 
+## [30] train-rmse:82159.820312 
+## [31] train-rmse:81364.164062 
+## [32] train-rmse:80853.546875 
+## [33] train-rmse:80371.421875 
+## [34] train-rmse:79901.835938 
+## [35] train-rmse:78588.664062 
+## [36] train-rmse:77774.710938 
+## [37] train-rmse:77077.117188 
+## [38] train-rmse:76199.179688 
+## [39] train-rmse:75790.492188 
+## [40] train-rmse:74668.507812 
+## [41] train-rmse:74293.781250 
+## [42] train-rmse:73751.773438 
+## [43] train-rmse:73350.132812 
+## [44] train-rmse:72954.171875 
+## [45] train-rmse:72614.031250 
+## [46] train-rmse:72235.031250 
+## [47] train-rmse:71976.101562 
+## [48] train-rmse:71547.273438 
+## [49] train-rmse:71251.390625 
+## [50] train-rmse:70807.109375 
+## [51] train-rmse:70380.164062 
+## [52] train-rmse:69804.546875 
+## [53] train-rmse:69199.429688 
+## [54] train-rmse:68787.609375 
+## [55] train-rmse:68516.406250 
+## [56] train-rmse:68081.765625 
+## [57] train-rmse:67716.843750 
+## [58] train-rmse:67344.562500 
+## [59] train-rmse:66918.960938 
+## [60] train-rmse:66717.812500 
+## [61] train-rmse:66479.546875 
+## [62] train-rmse:66181.437500 
+## [63] train-rmse:65704.335938 
+## [64] train-rmse:65526.847656 
+## [65] train-rmse:64901.535156 
+## [66] train-rmse:64562.789062 
+## [67] train-rmse:64312.882812 
+## [68] train-rmse:63945.535156 
+## [69] train-rmse:63788.687500 
+## [70] train-rmse:63669.523438 
+## [71] train-rmse:63330.351562 
+## [72] train-rmse:62930.242188 
+## [73] train-rmse:62647.652344 
+## [74] train-rmse:62435.625000 
+## [75] train-rmse:62018.207031 
+## [76] train-rmse:61696.101562 
+## [77] train-rmse:61430.570312 
+## [78] train-rmse:61299.855469 
+## [79] train-rmse:60988.093750 
+## [80] train-rmse:60636.531250 
+## [81] train-rmse:60484.207031 
+## [82] train-rmse:60056.117188 
+## [83] train-rmse:59890.898438 
+## [84] train-rmse:59630.875000 
+## [85] train-rmse:59212.617188 
+## [86] train-rmse:58990.972656 
+## [87] train-rmse:58914.523438 
+## [88] train-rmse:58815.738281 
+## [89] train-rmse:58679.941406 
+## [90] train-rmse:58335.257812 
+## [91] train-rmse:58000.582031 
+## [92] train-rmse:57770.875000 
+## [93] train-rmse:57683.148438 
+## [94] train-rmse:57446.726562 
+## [95] train-rmse:57272.789062 
+## [96] train-rmse:57012.554688 
+## [97] train-rmse:56924.316406 
+## [98] train-rmse:56732.238281 
+## [99] train-rmse:56482.246094 
+## [100]    train-rmse:56317.300781 
+## [101]    train-rmse:56073.582031 
+## [102]    train-rmse:55913.800781 
+## [103]    train-rmse:55772.304688 
+## [104]    train-rmse:55527.863281 
+## [105]    train-rmse:55264.070312 
+## [106]    train-rmse:55154.003906 
+## [107]    train-rmse:54823.808594 
+## [108]    train-rmse:54500.562500 
+## [109]    train-rmse:54183.511719 
+## [110]    train-rmse:53984.726562 
+## [111]    train-rmse:53834.500000 
+## [112]    train-rmse:53725.480469 
+## [113]    train-rmse:53646.316406 
+## [114]    train-rmse:53446.484375 
+## [115]    train-rmse:53196.007812 
+## [116]    train-rmse:52959.382812 
+## [117]    train-rmse:52815.273438 
+## [118]    train-rmse:52644.183594 
+## [119]    train-rmse:52306.523438 
+## [120]    train-rmse:52066.472656 
+## [121]    train-rmse:51909.792969 
+## [122]    train-rmse:51799.167969 
+## [123]    train-rmse:51639.886719 
+## [124]    train-rmse:51414.718750 
+## [125]    train-rmse:51297.722656 
+## [126]    train-rmse:51046.523438 
+## [127]    train-rmse:51000.660156 
+## [128]    train-rmse:50822.277344 
+## [129]    train-rmse:50750.937500 
+## [130]    train-rmse:50617.863281 
+## [131]    train-rmse:50404.070312 
+## [132]    train-rmse:50254.863281 
+## [133]    train-rmse:50081.511719 
+## [134]    train-rmse:49991.187500 
+## [135]    train-rmse:49737.097656 
+## [136]    train-rmse:49630.875000 
+## [137]    train-rmse:49374.660156 
+## [138]    train-rmse:49226.585938 
+## [139]    train-rmse:49122.039062 
+## [140]    train-rmse:49012.878906 
+## [141]    train-rmse:48837.867188 
+## [142]    train-rmse:48723.027344 
+## [143]    train-rmse:48477.382812 
+## [144]    train-rmse:48358.441406 
+## [145]    train-rmse:48277.535156 
+## [146]    train-rmse:48030.527344 
+## [147]    train-rmse:47880.421875 
+## [148]    train-rmse:47733.164062 
+## [149]    train-rmse:47565.167969 
+## [150]    train-rmse:47417.531250 
+## [151]    train-rmse:47252.492188 
+## [152]    train-rmse:46994.765625 
+## [153]    train-rmse:46788.894531 
+## [154]    train-rmse:46687.359375 
+## [155]    train-rmse:46572.898438 
+## [156]    train-rmse:46364.085938 
+## [157]    train-rmse:46094.769531 
+## [158]    train-rmse:45914.929688 
+## [159]    train-rmse:45793.750000 
+## [160]    train-rmse:45729.089844 
+## [161]    train-rmse:45687.429688 
+## [162]    train-rmse:45589.828125 
+## [163]    train-rmse:45415.964844 
+## [164]    train-rmse:45202.183594 
+## [165]    train-rmse:45145.261719 
+## [166]    train-rmse:45080.460938 
+## [167]    train-rmse:44905.625000 
+## [168]    train-rmse:44826.906250 
+## [169]    train-rmse:44692.488281 
+## [170]    train-rmse:44570.601562 
+## [171]    train-rmse:44433.984375 
+## [172]    train-rmse:44402.554688 
+## [173]    train-rmse:44248.851562 
+## [174]    train-rmse:44105.398438 
+## [175]    train-rmse:44002.035156 
+## [176]    train-rmse:43907.902344 
+## [177]    train-rmse:43580.765625 
+## [178]    train-rmse:43439.250000 
+## [179]    train-rmse:43350.074219 
+## [180]    train-rmse:43249.957031 
+## [181]    train-rmse:43216.414062 
+## [182]    train-rmse:43129.339844 
+## [183]    train-rmse:42994.515625 
+## [184]    train-rmse:42838.886719 
+## [185]    train-rmse:42781.218750 
+## [186]    train-rmse:42633.312500 
+## [187]    train-rmse:42510.886719 
+## [188]    train-rmse:42355.644531 
+## [189]    train-rmse:42266.628906 
+## [190]    train-rmse:42160.734375 
+## [191]    train-rmse:42060.175781 
+## [192]    train-rmse:41870.968750 
+## [193]    train-rmse:41834.578125 
+## [194]    train-rmse:41701.714844 
+## [195]    train-rmse:41528.265625 
+## [196]    train-rmse:41398.449219 
+## [197]    train-rmse:41366.851562 
+## [198]    train-rmse:41274.835938 
+## [199]    train-rmse:41132.949219 
+## [200]    train-rmse:40995.863281</code></pre>
+<pre class="r"><code>test_xgb&lt;-predict(xgb_0, newdata = as.matrix(train_val$test[, !'price', with=F]), type='response')
+mape_rf&lt;-mape(real=train_val$test$price, predicted = test_xgb)
+mape_rf</code></pre>
+<pre><code>## [1] 0.1293443</code></pre>
+<p>Using XGBoost with 200 rounds already proved to perform better than Random Forest with a MAPE score on the holdout of 12.9</p>
+</div>
+<div id="xgboost---log-scale-tree" class="section level3">
+<h3>XGBoost - log scale (tree)</h3>
+<p>Now we will try the same model but predicting on the target variable in a logarithmic scale:</p>
+<pre class="r"><code>xgb_0_log&lt;-xgboost(booster='gbtree',
+               data=as.matrix(train_val$train[, -c('price'), with = F]),
+               label= log(train_val$train$price),
+               nrounds = 200,
+               objective='reg:linear')</code></pre>
+<pre><code>## [1]  train-rmse:8.795152 
+## [2]  train-rmse:6.161392 
+## [3]  train-rmse:4.318283 
+## [4]  train-rmse:3.029167 
+## [5]  train-rmse:2.127673 
+## [6]  train-rmse:1.498084 
+## [7]  train-rmse:1.059144 
+## [8]  train-rmse:0.754962 
+## [9]  train-rmse:0.546143 
+## [10] train-rmse:0.404825 
+## [11] train-rmse:0.311152 
+## [12] train-rmse:0.251701 
+## [13] train-rmse:0.213532 
+## [14] train-rmse:0.192525 
+## [15] train-rmse:0.180899 
+## [16] train-rmse:0.173805 
+## [17] train-rmse:0.169336 
+## [18] train-rmse:0.165615 
+## [19] train-rmse:0.162838 
+## [20] train-rmse:0.160766 
+## [21] train-rmse:0.159505 
+## [22] train-rmse:0.157872 
+## [23] train-rmse:0.156711 
+## [24] train-rmse:0.155705 
+## [25] train-rmse:0.154409 
+## [26] train-rmse:0.153335 
+## [27] train-rmse:0.152550 
+## [28] train-rmse:0.151836 
+## [29] train-rmse:0.150905 
+## [30] train-rmse:0.149989 
+## [31] train-rmse:0.148087 
+## [32] train-rmse:0.147041 
+## [33] train-rmse:0.146170 
+## [34] train-rmse:0.145264 
+## [35] train-rmse:0.144125 
+## [36] train-rmse:0.143359 
+## [37] train-rmse:0.142124 
+## [38] train-rmse:0.141606 
+## [39] train-rmse:0.140913 
+## [40] train-rmse:0.140226 
+## [41] train-rmse:0.139189 
+## [42] train-rmse:0.138524 
+## [43] train-rmse:0.137912 
+## [44] train-rmse:0.137567 
+## [45] train-rmse:0.137013 
+## [46] train-rmse:0.136607 
+## [47] train-rmse:0.136024 
+## [48] train-rmse:0.135581 
+## [49] train-rmse:0.134809 
+## [50] train-rmse:0.134274 
+## [51] train-rmse:0.133923 
+## [52] train-rmse:0.133246 
+## [53] train-rmse:0.132092 
+## [54] train-rmse:0.131063 
+## [55] train-rmse:0.130625 
+## [56] train-rmse:0.129866 
+## [57] train-rmse:0.129385 
+## [58] train-rmse:0.128959 
+## [59] train-rmse:0.128155 
+## [60] train-rmse:0.127297 
+## [61] train-rmse:0.126874 
+## [62] train-rmse:0.126184 
+## [63] train-rmse:0.125589 
+## [64] train-rmse:0.125161 
+## [65] train-rmse:0.125029 
+## [66] train-rmse:0.124515 
+## [67] train-rmse:0.123910 
+## [68] train-rmse:0.123455 
+## [69] train-rmse:0.123200 
+## [70] train-rmse:0.122986 
+## [71] train-rmse:0.122786 
+## [72] train-rmse:0.122096 
+## [73] train-rmse:0.121540 
+## [74] train-rmse:0.120984 
+## [75] train-rmse:0.120499 
+## [76] train-rmse:0.120339 
+## [77] train-rmse:0.120118 
+## [78] train-rmse:0.119521 
+## [79] train-rmse:0.119373 
+## [80] train-rmse:0.118846 
+## [81] train-rmse:0.118354 
+## [82] train-rmse:0.117955 
+## [83] train-rmse:0.117704 
+## [84] train-rmse:0.117398 
+## [85] train-rmse:0.116906 
+## [86] train-rmse:0.116442 
+## [87] train-rmse:0.115790 
+## [88] train-rmse:0.114642 
+## [89] train-rmse:0.114341 
+## [90] train-rmse:0.114076 
+## [91] train-rmse:0.113889 
+## [92] train-rmse:0.113491 
+## [93] train-rmse:0.113327 
+## [94] train-rmse:0.113138 
+## [95] train-rmse:0.112863 
+## [96] train-rmse:0.112813 
+## [97] train-rmse:0.112323 
+## [98] train-rmse:0.111967 
+## [99] train-rmse:0.111285 
+## [100]    train-rmse:0.110792 
+## [101]    train-rmse:0.110395 
+## [102]    train-rmse:0.110132 
+## [103]    train-rmse:0.109957 
+## [104]    train-rmse:0.109777 
+## [105]    train-rmse:0.109352 
+## [106]    train-rmse:0.109082 
+## [107]    train-rmse:0.108772 
+## [108]    train-rmse:0.108620 
+## [109]    train-rmse:0.108285 
+## [110]    train-rmse:0.107886 
+## [111]    train-rmse:0.107679 
+## [112]    train-rmse:0.107431 
+## [113]    train-rmse:0.107226 
+## [114]    train-rmse:0.107138 
+## [115]    train-rmse:0.106774 
+## [116]    train-rmse:0.106496 
+## [117]    train-rmse:0.106277 
+## [118]    train-rmse:0.105982 
+## [119]    train-rmse:0.105814 
+## [120]    train-rmse:0.105616 
+## [121]    train-rmse:0.105386 
+## [122]    train-rmse:0.105133 
+## [123]    train-rmse:0.104753 
+## [124]    train-rmse:0.104571 
+## [125]    train-rmse:0.104521 
+## [126]    train-rmse:0.104288 
+## [127]    train-rmse:0.104116 
+## [128]    train-rmse:0.103711 
+## [129]    train-rmse:0.103565 
+## [130]    train-rmse:0.103429 
+## [131]    train-rmse:0.103101 
+## [132]    train-rmse:0.102547 
+## [133]    train-rmse:0.102282 
+## [134]    train-rmse:0.101891 
+## [135]    train-rmse:0.101690 
+## [136]    train-rmse:0.101430 
+## [137]    train-rmse:0.101047 
+## [138]    train-rmse:0.100889 
+## [139]    train-rmse:0.100703 
+## [140]    train-rmse:0.100532 
+## [141]    train-rmse:0.100398 
+## [142]    train-rmse:0.100023 
+## [143]    train-rmse:0.099943 
+## [144]    train-rmse:0.099594 
+## [145]    train-rmse:0.099281 
+## [146]    train-rmse:0.098725 
+## [147]    train-rmse:0.098160 
+## [148]    train-rmse:0.097852 
+## [149]    train-rmse:0.097695 
+## [150]    train-rmse:0.097474 
+## [151]    train-rmse:0.096901 
+## [152]    train-rmse:0.096632 
+## [153]    train-rmse:0.096516 
+## [154]    train-rmse:0.096221 
+## [155]    train-rmse:0.096162 
+## [156]    train-rmse:0.095835 
+## [157]    train-rmse:0.095455 
+## [158]    train-rmse:0.095356 
+## [159]    train-rmse:0.095043 
+## [160]    train-rmse:0.094855 
+## [161]    train-rmse:0.094512 
+## [162]    train-rmse:0.094340 
+## [163]    train-rmse:0.094025 
+## [164]    train-rmse:0.093574 
+## [165]    train-rmse:0.093309 
+## [166]    train-rmse:0.092937 
+## [167]    train-rmse:0.092428 
+## [168]    train-rmse:0.092267 
+## [169]    train-rmse:0.091930 
+## [170]    train-rmse:0.091686 
+## [171]    train-rmse:0.091519 
+## [172]    train-rmse:0.091343 
+## [173]    train-rmse:0.091222 
+## [174]    train-rmse:0.090940 
+## [175]    train-rmse:0.090590 
+## [176]    train-rmse:0.090524 
+## [177]    train-rmse:0.090260 
+## [178]    train-rmse:0.090008 
+## [179]    train-rmse:0.089892 
+## [180]    train-rmse:0.089695 
+## [181]    train-rmse:0.089533 
+## [182]    train-rmse:0.089361 
+## [183]    train-rmse:0.089104 
+## [184]    train-rmse:0.088754 
+## [185]    train-rmse:0.088368 
+## [186]    train-rmse:0.088046 
+## [187]    train-rmse:0.087925 
+## [188]    train-rmse:0.087635 
+## [189]    train-rmse:0.087498 
+## [190]    train-rmse:0.087365 
+## [191]    train-rmse:0.087121 
+## [192]    train-rmse:0.086864 
+## [193]    train-rmse:0.086679 
+## [194]    train-rmse:0.086465 
+## [195]    train-rmse:0.086155 
+## [196]    train-rmse:0.085647 
+## [197]    train-rmse:0.085473 
+## [198]    train-rmse:0.085324 
+## [199]    train-rmse:0.085035 
+## [200]    train-rmse:0.084830</code></pre>
+<pre class="r"><code>test_xgb_log&lt;-predict(xgb_0, newdata = as.matrix(train_val$test[, !'price', with=F]), type='response')
+mape_rf_log&lt;-mape(real=train_val$test$price, predicted = exp(test_xgb_log))
+mape_rf_log</code></pre>
+<pre><code>## [1] Inf</code></pre>
+</div>
+<div id="boosting-regression" class="section level3">
+<h3>Boosting Regression</h3>
+<pre class="r"><code>xgb_1&lt;-xgboost(booster='gblinear',
+               data=as.matrix(train_val$train[, -c('price'), with = F]),
+               label=train_val$train$price,
+               nrounds = 200,
+               objective='reg:linear')</code></pre>
+<pre><code>## [1]  train-rmse:226284.421875 
+## [2]  train-rmse:204104.531250 
+## [3]  train-rmse:197392.718750 
+## [4]  train-rmse:193646.437500 
+## [5]  train-rmse:191035.109375 
+## [6]  train-rmse:188946.171875 
+## [7]  train-rmse:187299.234375 
+## [8]  train-rmse:185758.343750 
+## [9]  train-rmse:184546.171875 
+## [10] train-rmse:183248.421875 
+## [11] train-rmse:182157.625000 
+## [12] train-rmse:181231.328125 
+## [13] train-rmse:180189.421875 
+## [14] train-rmse:179244.187500 
+## [15] train-rmse:178361.500000 
+## [16] train-rmse:177543.078125 
+## [17] train-rmse:176768.593750 
+## [18] train-rmse:176036.406250 
+## [19] train-rmse:175385.984375 
+## [20] train-rmse:174732.125000 
+## [21] train-rmse:174110.875000 
+## [22] train-rmse:173525.468750 
+## [23] train-rmse:172971.453125 
+## [24] train-rmse:172455.234375 
+## [25] train-rmse:171981.375000 
+## [26] train-rmse:171509.046875 
+## [27] train-rmse:171046.906250 
+## [28] train-rmse:170602.578125 
+## [29] train-rmse:170175.234375 
+## [30] train-rmse:169796.359375 
+## [31] train-rmse:169394.562500 
+## [32] train-rmse:169014.734375 
+## [33] train-rmse:168649.046875 
+## [34] train-rmse:168296.593750 
+## [35] train-rmse:167956.234375 
+## [36] train-rmse:167628.453125 
+## [37] train-rmse:167311.203125 
+## [38] train-rmse:167005.140625 
+## [39] train-rmse:166710.781250 
+## [40] train-rmse:166457.578125 
+## [41] train-rmse:166178.578125 
+## [42] train-rmse:165909.968750 
+## [43] train-rmse:165649.687500 
+## [44] train-rmse:165398.234375 
+## [45] train-rmse:165152.281250 
+## [46] train-rmse:164917.375000 
+## [47] train-rmse:164703.750000 
+## [48] train-rmse:164481.781250 
+## [49] train-rmse:164266.218750 
+## [50] train-rmse:164056.281250 
+## [51] train-rmse:163852.187500 
+## [52] train-rmse:163655.125000 
+## [53] train-rmse:163461.531250 
+## [54] train-rmse:163273.562500 
+## [55] train-rmse:163090.812500 
+## [56] train-rmse:162922.046875 
+## [57] train-rmse:162765.765625 
+## [58] train-rmse:162590.890625 
+## [59] train-rmse:162429.406250 
+## [60] train-rmse:162271.718750 
+## [61] train-rmse:162117.953125 
+## [62] train-rmse:161968.140625 
+## [63] train-rmse:161822.078125 
+## [64] train-rmse:161679.890625 
+## [65] train-rmse:161541.343750 
+## [66] train-rmse:161407.062500 
+## [67] train-rmse:161275.625000 
+## [68] train-rmse:161147.640625 
+## [69] train-rmse:161023.421875 
+## [70] train-rmse:160902.718750 
+## [71] train-rmse:160788.234375 
+## [72] train-rmse:160673.781250 
+## [73] train-rmse:160561.968750 
+## [74] train-rmse:160452.640625 
+## [75] train-rmse:160346.593750 
+## [76] train-rmse:160243.328125 
+## [77] train-rmse:160143.140625 
+## [78] train-rmse:160045.046875 
+## [79] train-rmse:159949.687500 
+## [80] train-rmse:159856.671875 
+## [81] train-rmse:159766.187500 
+## [82] train-rmse:159678.078125 
+## [83] train-rmse:159592.500000 
+## [84] train-rmse:159508.890625 
+## [85] train-rmse:159430.218750 
+## [86] train-rmse:159351.062500 
+## [87] train-rmse:159273.968750 
+## [88] train-rmse:159198.953125 
+## [89] train-rmse:159125.953125 
+## [90] train-rmse:159058.218750 
+## [91] train-rmse:158990.375000 
+## [92] train-rmse:158925.000000 
+## [93] train-rmse:158860.281250 
+## [94] train-rmse:158797.187500 
+## [95] train-rmse:158735.562500 
+## [96] train-rmse:158674.906250 
+## [97] train-rmse:158610.625000 
+## [98] train-rmse:158552.328125 
+## [99] train-rmse:158496.562500 
+## [100]    train-rmse:158442.578125 
+## [101]    train-rmse:158389.750000 
+## [102]    train-rmse:158337.937500 
+## [103]    train-rmse:158287.218750 
+## [104]    train-rmse:158237.906250 
+## [105]    train-rmse:158189.718750 
+## [106]    train-rmse:158142.703125 
+## [107]    train-rmse:158096.828125 
+## [108]    train-rmse:158052.125000 
+## [109]    train-rmse:158008.484375 
+## [110]    train-rmse:157965.781250 
+## [111]    train-rmse:157925.359375 
+## [112]    train-rmse:157884.656250 
+## [113]    train-rmse:157844.921875 
+## [114]    train-rmse:157806.250000 
+## [115]    train-rmse:157768.531250 
+## [116]    train-rmse:157731.765625 
+## [117]    train-rmse:157691.921875 
+## [118]    train-rmse:157657.890625 
+## [119]    train-rmse:157624.015625 
+## [120]    train-rmse:157590.984375 
+## [121]    train-rmse:157558.562500 
+## [122]    train-rmse:157526.812500 
+## [123]    train-rmse:157495.812500 
+## [124]    train-rmse:157465.421875 
+## [125]    train-rmse:157435.781250 
+## [126]    train-rmse:157407.343750 
+## [127]    train-rmse:157378.953125 
+## [128]    train-rmse:157351.312500 
+## [129]    train-rmse:157324.328125 
+## [130]    train-rmse:157297.937500 
+## [131]    train-rmse:157272.187500 
+## [132]    train-rmse:157246.953125 
+## [133]    train-rmse:157222.343750 
+## [134]    train-rmse:157195.406250 
+## [135]    train-rmse:157172.312500 
+## [136]    train-rmse:157149.593750 
+## [137]    train-rmse:157127.312500 
+## [138]    train-rmse:157105.437500 
+## [139]    train-rmse:157083.328125 
+## [140]    train-rmse:157062.515625 
+## [141]    train-rmse:157042.109375 
+## [142]    train-rmse:157022.031250 
+## [143]    train-rmse:157002.343750 
+## [144]    train-rmse:156983.015625 
+## [145]    train-rmse:156964.125000 
+## [146]    train-rmse:156945.500000 
+## [147]    train-rmse:156927.406250 
+## [148]    train-rmse:156909.656250 
+## [149]    train-rmse:156892.109375 
+## [150]    train-rmse:156874.937500 
+## [151]    train-rmse:156858.203125 
+## [152]    train-rmse:156841.765625 
+## [153]    train-rmse:156826.187500 
+## [154]    train-rmse:156810.625000 
+## [155]    train-rmse:156795.265625 
+## [156]    train-rmse:156780.140625 
+## [157]    train-rmse:156763.375000 
+## [158]    train-rmse:156749.171875 
+## [159]    train-rmse:156735.062500 
+## [160]    train-rmse:156721.140625 
+## [161]    train-rmse:156707.406250 
+## [162]    train-rmse:156693.859375 
+## [163]    train-rmse:156680.562500 
+## [164]    train-rmse:156666.828125 
+## [165]    train-rmse:156654.125000 
+## [166]    train-rmse:156641.625000 
+## [167]    train-rmse:156629.890625 
+## [168]    train-rmse:156617.890625 
+## [169]    train-rmse:156606.156250 
+## [170]    train-rmse:156594.546875 
+## [171]    train-rmse:156583.093750 
+## [172]    train-rmse:156571.796875 
+## [173]    train-rmse:156560.671875 
+## [174]    train-rmse:156548.156250 
+## [175]    train-rmse:156537.625000 
+## [176]    train-rmse:156527.140625 
+## [177]    train-rmse:156516.765625 
+## [178]    train-rmse:156506.484375 
+## [179]    train-rmse:156496.437500 
+## [180]    train-rmse:156486.406250 
+## [181]    train-rmse:156476.656250 
+## [182]    train-rmse:156466.953125 
+## [183]    train-rmse:156457.625000 
+## [184]    train-rmse:156448.218750 
+## [185]    train-rmse:156438.953125 
+## [186]    train-rmse:156429.796875 
+## [187]    train-rmse:156420.781250 
+## [188]    train-rmse:156411.953125 
+## [189]    train-rmse:156403.734375 
+## [190]    train-rmse:156395.078125 
+## [191]    train-rmse:156385.468750 
+## [192]    train-rmse:156376.187500 
+## [193]    train-rmse:156368.171875 
+## [194]    train-rmse:156360.140625 
+## [195]    train-rmse:156352.156250 
+## [196]    train-rmse:156344.343750 
+## [197]    train-rmse:156336.015625 
+## [198]    train-rmse:156328.406250 
+## [199]    train-rmse:156320.828125 
+## [200]    train-rmse:156313.328125</code></pre>
+<pre class="r"><code>test_xgb1&lt;-predict(xgb_1, newdata = as.matrix(train_val$test[, !'price', with=F]), type='response')
+mape_rf1&lt;-mape(real=train_val$test$price, predicted = test_xgb1)
+mape_rf1</code></pre>
+<pre><code>## [1] 0.1919694</code></pre>
+<p>After trying several models, boosting tree in the logarihtmic scale seems to be the one showing a better performance.</p>
+<p>Thus, this will be the model we will tune with Cross-Validation and Hyper Parameter Tuning before running the model on our test set.</p>
+</div>
+</div>
+<div id="model-tuning" class="section level2">
+<h2>Model Tuning</h2>
+<pre class="r"><code>#defining the grid
+tune_grid &lt;- expand.grid(
+  nrounds = seq(from = 200, to = 500, by = 100),
+  eta = c(0.025, 0.05, 0.1),
+  max_depth = c(2, 3, 4),
+  gamma = 0,
+  colsample_bytree = 1,
+  min_child_weight = 1,
+  subsample = 1
+)
+
+tune_control &lt;- caret::trainControl(
+  method = &quot;cv&quot;, # cross-validation
+  number = 5, # with n folds 
+  #index = createFolds(tr_treated$Id_clean), # fix the folds
+  verboseIter = FALSE, # no training log
+  allowParallel = TRUE # FALSE for reproducible results 
+)
+
+xgb_tune &lt;- caret::train(
+  x = as.matrix(train_val$train[, -c('price'), with = F]),
+  y = log(train_val$train$price),
+  trControl = tune_control,
+  tuneGrid = tune_grid,
+  method = &quot;xgbTree&quot;,
+  verbose = TRUE
+)
+
+
+test_xgb_log_tune&lt;-predict(xgb_tune$finalModel, newdata = as.matrix(train_val$test[, !'price', with=F]), type='response')
+mape_rf_log_tune&lt;-mape(real=train_val$test$price, predicted = exp(test_xgb_log_tune))
+mape_rf_log_tune</code></pre>
+<pre><code>## [1] 0.1205633</code></pre>
+<p>The best model after Tuning the XGBoot Tree gives us a MAPE of 12.05 on our validation set. Now we will use this model to train on the whole training data and generate the predictions on our test dataset.</p>
+</div>
+<div id="final-model" class="section level2">
+<h2>Final Model</h2>
+<pre class="r"><code>xgb_tune_final &lt;- caret::train(
+  x = as.matrix(train_data_enc$train[, -c('price'), with = F]),
+  y = log(train_data_enc$train$price),
+  trControl = tune_control,
+  tuneGrid = tune_grid,
+  method = &quot;xgbTree&quot;,
+  verbose = TRUE
+)
+
+
+test_final&lt;-predict(xgb_tune_final$finalModel, newdata = as.matrix(train_data_enc$test[, !'price', with=F]), type='response')</code></pre>
+<div id="exporting-final-predictions" class="section level3">
+<h3>Exporting final predictions</h3>
+<pre class="r"><code>write.csv(exp(test_final), file = &quot;predictions_tomas_tello.csv&quot;)</code></pre>
+</div>
 </div>
 
 
