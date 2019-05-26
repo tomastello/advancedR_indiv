@@ -45,6 +45,8 @@ transformations <- function(df){
   df[ , names(df)[sapply(df, is.integer)]:=
              lapply(.SD,as.numeric),.SDcols = 
              names(df)[sapply(df, is.integer)]]
+  
+  return(df)
 }
 
 train_data <- transformations(raw_data_train)
@@ -85,17 +87,33 @@ We then update the transformations function and apply it to the dataset:
 ```{r data preparation 2}
 
 transformations <- function(df){
+  df1 <- data.table(df)
+  
   #convert to date format
-  df$date <- as.Date(df$date, "%m/%d/%Y")
+  df1$date <- as.Date(df1$date, "%m/%d/%Y")
   #convert discrete variables to factors
-  df$zipcode <- as.factor(df$zipcode)
-  df$condition <- as.factor(df$condition)
-  df$view <- as.factor(df$view)
-  df$floors <- as.factor(df$floors)
+  df1$zipcode <- as.factor(df1$zipcode)
+  df1$condition <- as.factor(df1$condition)
+  df1$view <- as.factor(df1$view)
+  df1$floors <- as.factor(df1$floors)
   #convert all integers to numeric
-  df[ , names(df)[sapply(df, is.integer)]:=
+  df1[ , names(df1)[sapply(df1, is.integer)]:=
              lapply(.SD,as.numeric),.SDcols = 
-             names(df)[sapply(df, is.integer)]]
+             names(df1)[sapply(df1, is.integer)]]
+  
+  return(df1)
+}
+
+scale_df <- function(df){
+  df1 <- data.table(df)
+  
+  numeric_vars <- names(df1)[sapply(df1, is.numeric)]
+  numeric_vars <- numeric_vars[!numeric_vars %in% c('price')]
+  ## Scale 
+  df1[, (numeric_vars) := lapply(.SD, scale), .SDcols=numeric_vars]
+  
+  return(df1)  
+  
 }
 
 train_data <- transformations(raw_data_train)
@@ -149,7 +167,6 @@ stacked_dum <- dummify(stacked, maxcat = 70)
 train_data_sub <- stacked_dum[stacked_dum$train == 1, -'train']
 test_data_sub <- stacked_dum[stacked_dum$train == 0, -'train']
 
-str(train_data_sub)
 ```
 
 To evaluate our baseline model and the feature engineering process, we will take a holdout (validation data) from the train dataset using the f_partition script:
@@ -158,17 +175,15 @@ To evaluate our baseline model and the feature engineering process, we will take
 
 train_val <- f_partition(train_data_sub, seed = 1414)
 
-str(train_val)
-
 ```
 
 Now we train our baseline model. The metric for our predictions will be the Mean Absolute Percent Error (MAPE). After obtaining our baseline score, we will perform some feature engineering and evaluate if these new features help reducing the MAPE.
 
 ```{r baseline}
 
-baseline <- lm(price ~ ., data=train_val$train)
+baseline <- lm(price ~ ., data=scale_df(train_val$train))
 
-test_lm<-predict(baseline, newdata = train_val$test)
+test_lm<-predict(baseline, newdata = scale_df(train_val$test))
 mape_lm<-mape(real=train_val$test$price, predicted = test_lm)
 mape_lm
 
@@ -176,7 +191,353 @@ mape_lm
 
 ## Feature Engineering
 
+### Data preparation pipeline
+Before the feature engineering process, we will define every step prev 
+
+```{r prep pipeline}
+
+feat_select <- function(df){
+    df_sub <- df[, -c('id', 'sqft_living15', 'sqft_lot15', 'sqft_above', 'date')]
+    
+    return(df_sub)
+}
+
+encode <- function(df_train, df_test){
+  
+  df_train$train <- 1
+  df_test$train <- 0
+
+  stacked <- rbind(df_train, df_test, fill = TRUE)
+
+  #Dummify the stacked data table
+  stacked_dum <- dummify(stacked, maxcat = 100)
+  
+  #Split again based on 'train' flag
+  df_train <- stacked_dum[stacked_dum$train == 1, -'train']
+  df_test <- stacked_dum[stacked_dum$train == 0, -'train']
+  
+  return(list("train" = df_train, "test" = df_test))
+}
+
+
+```
+
 ### House age
 The first feature to be created is the house age which will be obtained from the difference between the date of sale and the date of construction. 
 
+```{r house age}
 
+train_data <- transformations(raw_data_train)
+test_data <- transformations(raw_data_test)
+
+train_data$house_age <- year(train_data$date) - train_data$yr_built
+test_data$house_age <- year(test_data$date) - test_data$yr_built
+
+
+train_data_sub <- feat_select(train_data)
+test_data_sub <- feat_select(test_data)
+
+#train_data_enc <- encode(train_data_sub, test_data_sub)
+
+train_val <- f_partition(train_data_sub, seed = 1414)
+
+baseline <- lm(price ~ ., data= scale_df(train_val$train))
+
+test_lm<-predict(baseline, newdata = scale_df(train_val$test))
+mape_lm<-mape(real=train_val$test$price, predicted = test_lm)
+mape_lm
+
+```
+
+Calculating the house age already improved the MAPE by a little, so we are keeping this feature
+
+### House age after renovation
+Similar to the last feature, now we will calculate the age of the house after renovation. If it has not been renewed, we will keep this value as 0.
+
+```{r house age renov}
+
+renovation_age <- function(df){
+  df1 <- data.table(df)
+  
+  df1$renov_age <- 0
+  
+  for (i in 1:nrow(df)){
+    if(df1$yr_renovated[i]>0){
+      df1$renov_age[i] <- year(df1$date[i]) - df1$yr_renovated[i]
+    }
+  }
+  
+  return(df1)
+}
+
+train_data <- renovation_age(train_data)
+test_data <- renovation_age(test_data)
+
+feat_select <- function(df){
+    df_sub <- df[, -c('id', 'sqft_living15', 'sqft_lot15', 'sqft_above', 'date')]
+    
+    return(df_sub)
+}
+
+train_data_sub <- feat_select(train_data)
+test_data_sub <- feat_select(test_data)
+
+#train_data_enc <- encode(train_data_sub, test_data_sub)
+
+train_val <- f_partition(train_data_sub, seed = 1414)
+
+baseline <- lm(price ~ ., data= scale_df(train_val$train))
+
+test_lm<-predict(baseline, newdata = scale_df(train_val$test))
+mape_lm<-mape(real=train_val$test$price, predicted = test_lm)
+mape_lm
+
+```
+
+Although there is no significant improvement in the score, we will keep this feature too.
+
+### Property size features
+The dataset contains several features related to the property size. We will try to generate new features trying linear combinations of these size features so explore which ones improve our score:
+
+```{r size features}
+
+size_features <- function(df){
+  df1 <- data.table(df)
+  
+  df1$living_lot_ratio <- df1$sqft_living/df1$sqft_lot
+  df1$above_lot_ratio <- df1$sqft_above/df1$sqft_lot
+  df1$basement_lot_ratio <- df1$sqft_basement/df1$sqft_lot
+  df1$basement_living_ratio <- df1$sqft_basement/df1$sqft_living
+  
+  return(df1)
+}
+
+train_data <- size_features(train_data)
+test_data <- size_features(test_data)
+
+train_data_sub <- feat_select(train_data)
+test_data_sub <- feat_select(test_data)
+
+#train_data_enc <- encode(train_data_sub, test_data_sub)
+
+train_val <- f_partition(train_data_sub, seed = 1414)
+
+baseline <- lm(price ~ ., data= scale_df(train_val$train))
+
+test_lm<-predict(baseline, newdata = scale_df(train_val$test))
+mape_lm<-mape(real=train_val$test$price, predicted = test_lm)
+mape_lm
+```
+These new features show some improvement to our MAPE score so we will keep them.
+
+### Clustering
+The final step in our feature engineering process will be to create clusters based on location and size feature from our dataset
+
+```{r clustering}
+
+clustering <- function(df_train, df_test){
+ 
+  df_train$train <- 1
+  df_test$train <- 0
+  
+  df1 <- rbind(df_train, df_test, fill = TRUE)
+  
+  set.seed(1912)
+  clusters <- kmeans(scale(df1[,c("lat", "long", "living_lot_ratio", "basement_living_ratio")]),50)
+  
+  df1$cluster <- as.factor(clusters$cluster)
+  
+  df_train <- df1[df1$train == 1, -'train']
+  df_test <- df1[df1$train == 0, -'train']
+  
+  return(list("train" = df_train, "test" = df_test))
+  
+}
+
+clustered <- clustering(train_data, test_data)
+
+train_data <- clustered$train
+test_data <- clustered$test
+
+train_data_sub <- feat_select(train_data)
+test_data_sub <- feat_select(test_data)
+
+#train_data_enc <- encode(train_data_sub, test_data_sub)
+
+train_val <- f_partition(train_data_sub, seed = 1414)
+
+baseline <- lm(price ~ ., data= scale_df(train_val$train))
+
+test_lm<-predict(baseline, newdata = scale_df(train_val$test))
+mape_lm<-mape(real=train_val$test$price, predicted = test_lm)
+mape_lm
+```
+The score after the clustering show also some improvement so we will keep these new features.
+
+Now that we have an improved dataset with new features, we will proceed to try different models and test them on our validation set, and later do cross validation, to select a model that can predict best the house prices with the features from our dataset.
+
+
+## Modeling
+
+### Linear model with stepwise feature selection
+
+First we will try a linear regression with stepwise feature selection. This will help us both improve our score and also detect which variables are the most important ones to be used for our analysis.
+
+```{r stepwise}
+
+stepwise <- stepAIC(lm(price ~ ., data= scale_df(train_val$train)), trace = F)
+
+summary(stepwise)
+
+test_lms<-predict(stepwise, newdata = scale_df(train_val$test))
+mape_lms<-mape(real=train_val$test$price, predicted = test_lms)
+mape_lms
+```
+
+This model did not improve much our score so we will try with another family of models (random forest and XGBoost)
+
+### Random Forest Regression
+
+```{r Random Forest}
+
+RF <- randomForest(price ~ ., data= train_val$train[,-c('zipcode')])
+
+
+
+test_rf<-predict(RF, newdata = train_val$test[,-c('zipcode')])
+mape_rf<-mape(real=train_val$test$price, predicted = test_rf)
+mape_rf
+
+```
+
+Random Forest already shows to be a much better model than linear regression. Now we will compare this model's performance with XGBoost:
+
+### XGBoost (tree)
+
+```{r XGBoost}
+train_data_enc <- encode(train_data_sub, test_data_sub)
+train_val <- f_partition(train_data_enc$train, seed = 1414)
+
+xgb_0<-xgboost(booster='gbtree',
+               data=as.matrix(train_val$train[, -c('price'), with = F]),
+               label=train_val$train$price,
+               nrounds = 200,
+               objective='reg:linear')
+
+
+test_xgb<-predict(xgb_0, newdata = as.matrix(train_val$test[, !'price', with=F]), type='response')
+mape_rf<-mape(real=train_val$test$price, predicted = test_xgb)
+mape_rf
+
+```
+Using XGBoost with 200 rounds already proved to perform better than Random Forest with a MAPE score on the holdout of 12.9
+
+### XGBoost - log scale (tree)
+
+Now we will try the same model but predicting on the target variable in a logarithmic scale:
+
+```{r XGBoost log}
+
+xgb_0_log<-xgboost(booster='gbtree',
+               data=as.matrix(train_val$train[, -c('price'), with = F]),
+               label= log(train_val$train$price),
+               nrounds = 200,
+               objective='reg:linear')
+
+
+test_xgb_log<-predict(xgb_0, newdata = as.matrix(train_val$test[, !'price', with=F]), type='response')
+mape_rf_log<-mape(real=train_val$test$price, predicted = exp(test_xgb_log))
+mape_rf_log
+
+```
+
+
+
+### Boosting Regression
+
+```{r XGBoost reg}
+
+xgb_1<-xgboost(booster='gblinear',
+               data=as.matrix(train_val$train[, -c('price'), with = F]),
+               label=train_val$train$price,
+               nrounds = 200,
+               objective='reg:linear')
+
+
+test_xgb1<-predict(xgb_1, newdata = as.matrix(train_val$test[, !'price', with=F]), type='response')
+mape_rf1<-mape(real=train_val$test$price, predicted = test_xgb1)
+mape_rf1
+
+```
+After trying several models, boosting tree in the logarihtmic scale seems to be the one showing a better performance.
+
+Thus, this will be the model we will tune with Cross-Validation and Hyper Parameter Tuning before running the model on our test set.
+
+## Model Tuning
+
+```{r XGBoost log}
+
+#defining the grid
+tune_grid <- expand.grid(
+  nrounds = seq(from = 200, to = 500, by = 100),
+  eta = c(0.025, 0.05, 0.1),
+  max_depth = c(2, 3, 4),
+  gamma = 0,
+  colsample_bytree = 1,
+  min_child_weight = 1,
+  subsample = 1
+)
+
+tune_control <- caret::trainControl(
+  method = "cv", # cross-validation
+  number = 5, # with n folds 
+  #index = createFolds(tr_treated$Id_clean), # fix the folds
+  verboseIter = FALSE, # no training log
+  allowParallel = TRUE # FALSE for reproducible results 
+)
+
+xgb_tune <- caret::train(
+  x = as.matrix(train_val$train[, -c('price'), with = F]),
+  y = log(train_val$train$price),
+  trControl = tune_control,
+  tuneGrid = tune_grid,
+  method = "xgbTree",
+  verbose = TRUE
+)
+
+
+test_xgb_log_tune<-predict(xgb_tune$finalModel, newdata = as.matrix(train_val$test[, !'price', with=F]), type='response')
+mape_rf_log_tune<-mape(real=train_val$test$price, predicted = exp(test_xgb_log_tune))
+mape_rf_log_tune
+
+```
+
+The best model after Tuning the XGBoot Tree gives us a MAPE of 12.05 on our validation set. Now we will use this model to train on the whole training data and generate the predictions on our test dataset.
+
+## Final Model
+
+```{r XGBoost log}
+
+xgb_tune_final <- caret::train(
+  x = as.matrix(train_data_enc$train[, -c('price'), with = F]),
+  y = log(train_data_enc$train$price),
+  trControl = tune_control,
+  tuneGrid = tune_grid,
+  method = "xgbTree",
+  verbose = TRUE
+)
+
+
+test_final<-predict(xgb_tune_final$finalModel, newdata = as.matrix(train_data_enc$test[, !'price', with=F]), type='response')
+
+
+```
+
+### Exporting final predictions
+
+```{r XGBoost log}
+
+write.csv(exp(test_final), file = "predictions_tomas_tello.csv")
+
+
+```
