@@ -475,7 +475,7 @@ Thus, this will be the model we will tune with Cross-Validation and Hyper Parame
 
 ## Model Tuning
 
-```{r XGBoost log}
+```{r XGBoost log tuning}
 
 #defining the grid
 tune_grid <- expand.grid(
@@ -516,7 +516,7 @@ The best model after Tuning the XGBoot Tree gives us a MAPE of 12.05 on our vali
 
 ## Final Model
 
-```{r XGBoost log}
+```{r XGBoost log final}
 
 xgb_tune_final <- caret::train(
   x = as.matrix(train_data_enc$train[, -c('price'), with = F]),
@@ -535,7 +535,7 @@ test_final<-predict(xgb_tune_final$finalModel, newdata = as.matrix(train_data_en
 
 ### Exporting final predictions
 
-```{r XGBoost log}
+```{r export}
 
 write.csv(exp(test_final), file = "predictions_tomas_tello.csv")
 
